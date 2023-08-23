@@ -1,0 +1,51 @@
+name: Release
+
+on:
+  create:
+    tags:
+      - '*'
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    env:
+      VERSION: '0.0'
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Go environment
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+          cache: true
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install build-essential
+
+      - uses: Jimver/cuda-toolkit@v0.2.11
+        id: cuda-toolkit
+        with:
+          cuda: '12.1.0'
+
+      - name: Print CUDA path
+        run: |
+          echo "CUDA_PATH: $CUDA_PATH"
+          echo "CUDA_HOME: $CUDA_HOME"
+          which nvcc
+          nvcc -V
+          gcc --version
+          g++ --version
+
+      - name: Run build script
+        run: bash deps.sh
+
+      # - name: Upload to Gemfury (optional)
+      #   if: success()  # Only run if the previous steps were successful.
+      #   run: |
+      #     FURY_TOKEN=${{ secrets.GEMFURY_API_TOKEN }}
+      #     curl -F "package=@dist/ollama-arm64.deb" https://push.fury.io/upload/${FURY_TOKEN}/
+      #     curl -F "package=@dist/ollama-amd64.deb" https://push.fury.io/upload/${FURY_TOKEN}/
+      #   env:
+      #     GEMFURY_API_TOKEN: ${{ secrets.GEMFURY_API_TOKEN }}

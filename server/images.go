@@ -955,8 +955,8 @@ func PushModel(ctx context.Context, name string, regOpts *RegistryOptions, fn fu
 			return err
 		}
 
-		if strings.HasPrefix(path.Base(location), "sha256:") {
-			layer.Digest = path.Base(location)
+		if strings.HasPrefix(path.Base("location"), "sha256:") {
+			layer.Digest = path.Base("location")
 			fn(api.ProgressResponse{
 				Status:    "using existing layer",
 				Digest:    layer.Digest,
@@ -1129,28 +1129,6 @@ func GetSHA256Digest(r io.Reader) (string, int) {
 
 type requestContextKey string
 
-func startUpload(ctx context.Context, mp ModelPath, layer *Layer, regOpts *RegistryOptions) (string, error) {
-	url := fmt.Sprintf("%s/v2/%s/blobs/uploads/", mp.Registry, mp.GetNamespaceRepository())
-	if layer.From != "" {
-		url = fmt.Sprintf("%s/v2/%s/blobs/uploads/?mount=%s&from=%s", mp.Registry, mp.GetNamespaceRepository(), layer.Digest, layer.From)
-	}
-
-	resp, err := makeRequestWithRetry(ctx, "POST", url, nil, nil, regOpts)
-	if err != nil {
-		log.Printf("couldn't start upload: %v", err)
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	// Extract UUID location from header
-	location := resp.Header.Get("Location")
-	if location == "" {
-		return "", fmt.Errorf("location header is missing in response")
-	}
-
-	return location, nil
-}
-
 // Function to check if a blob already exists in the Docker registry
 func checkBlobExistence(ctx context.Context, mp ModelPath, digest string, regOpts *RegistryOptions) (bool, error) {
 	url := fmt.Sprintf("%s/v2/%s/blobs/%s", mp.Registry, mp.GetNamespaceRepository(), digest)
@@ -1164,85 +1142,6 @@ func checkBlobExistence(ctx context.Context, mp ModelPath, digest string, regOpt
 
 	// Check for success: If the blob exists, the Docker registry will respond with a 200 OK
 	return resp.StatusCode == http.StatusOK, nil
-}
-
-func uploadBlobChunked(ctx context.Context, mp ModelPath, url string, layer *Layer, regOpts *RegistryOptions, fn func(api.ProgressResponse)) error {
-	// TODO allow resumability
-	// TODO allow canceling uploads via DELETE
-
-	fp, err := GetBlobsPath(layer.Digest)
-	if err != nil {
-		return err
-	}
-
-	f, err := os.Open(fp)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	var completed int64
-	chunkSize := 10 * 1024 * 1024
-
-	for {
-		chunk := int64(layer.Size) - completed
-		if chunk > int64(chunkSize) {
-			chunk = int64(chunkSize)
-		}
-
-		sectionReader := io.NewSectionReader(f, int64(completed), chunk)
-
-		headers := make(map[string]string)
-		headers["Content-Type"] = "application/octet-stream"
-		headers["Content-Length"] = strconv.Itoa(int(chunk))
-		headers["Content-Range"] = fmt.Sprintf("%d-%d", completed, completed+sectionReader.Size()-1)
-
-		resp, err := makeRequestWithRetry(ctx, "PATCH", url, headers, sectionReader, regOpts)
-		if err != nil && !errors.Is(err, io.EOF) {
-			fn(api.ProgressResponse{
-				Status:    fmt.Sprintf("error uploading chunk: %v", err),
-				Digest:    layer.Digest,
-				Total:     layer.Size,
-				Completed: int(completed),
-			})
-
-			return err
-		}
-		defer resp.Body.Close()
-
-		completed += sectionReader.Size()
-		fn(api.ProgressResponse{
-			Status:    fmt.Sprintf("uploading %s", layer.Digest),
-			Digest:    layer.Digest,
-			Total:     layer.Size,
-			Completed: int(completed),
-		})
-
-		url = resp.Header.Get("Location")
-		if completed >= int64(layer.Size) {
-			break
-		}
-	}
-
-	url = fmt.Sprintf("%s&digest=%s", url, layer.Digest)
-
-	headers := make(map[string]string)
-	headers["Content-Type"] = "application/octet-stream"
-	headers["Content-Length"] = "0"
-
-	// finish the upload
-	resp, err := makeRequest(ctx, "PUT", url, headers, nil, regOpts)
-	if err != nil {
-		log.Printf("couldn't finish upload: %v", err)
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusCreated {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("on finish upload registry responded with code %d: %v", resp.StatusCode, string(body))
-	}
-	return nil
 }
 
 func makeRequestWithRetry(ctx context.Context, method, url string, headers map[string]string, body io.ReadSeeker, regOpts *RegistryOptions) (*http.Response, error) {

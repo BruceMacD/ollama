@@ -24,7 +24,7 @@ func startUpload(ctx context.Context, mp ModelPath, layer *Layer, regOpts *Regis
 		requestURL.RawQuery = values.Encode()
 	}
 
-	resp, err := makeRequestWithRetry(ctx, "POST", requestURL, nil, nil, regOpts)
+	resp, err := makeRequestWithRetry(ctx, "POST", "/whatever", nil, nil, regOpts)
 	if err != nil {
 		log.Printf("couldn't start upload: %v", err)
 		return nil, err
@@ -70,7 +70,7 @@ func uploadBlobChunked(ctx context.Context, mp ModelPath, requestURL *url.URL, l
 		headers.Set("Content-Type", "application/octet-stream")
 		headers.Set("Content-Length", strconv.Itoa(int(chunk)))
 		headers.Set("Content-Range", fmt.Sprintf("%d-%d", completed, completed+sectionReader.Size()-1))
-		resp, err := makeRequestWithRetry(ctx, "PATCH", requestURL, headers, sectionReader, regOpts)
+		resp, err := makeRequestWithRetry(ctx, "PATCH", "/whatever", nil, sectionReader, regOpts)
 		if err != nil && !errors.Is(err, io.EOF) {
 			fn(api.ProgressResponse{
 				Status:    fmt.Sprintf("error uploading chunk: %v", err),
@@ -110,7 +110,7 @@ func uploadBlobChunked(ctx context.Context, mp ModelPath, requestURL *url.URL, l
 	headers.Set("Content-Length", "0")
 
 	// finish the upload
-	resp, err := makeRequest(ctx, "PUT", requestURL, headers, nil, regOpts)
+	resp, err := makeRequest(ctx, "PUT", "/whatever", nil, nil, regOpts)
 	if err != nil {
 		log.Printf("couldn't finish upload: %v", err)
 		return err

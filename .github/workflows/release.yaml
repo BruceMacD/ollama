@@ -8,36 +8,33 @@ jobs:
   linux:
     permissions: write-all
     runs-on: ubuntu-latest
-    container:
-      image: ${{ matrix.docker_image }}
-    strategy:
-      matrix:
-        docker_image: ['amd64/golang:1.21.0', 'arm64v8/golang:1.21.0']
-        goarch: ['amd64', 'arm64']
-    env:
-      GOARCH: ${{ matrix.goarch }}
     steps:
       - uses: actions/checkout@v3
 
-      - name: Setup dependencies
+      - name: Setup Go environment
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+          cache: true
+
+      - name: Install dependencies
         run: |
-          apt-get update
-          apt-get install -y build-essential
+          sudo apt-get update
+          sudo apt-get install build-essential
 
       - name: Build CPU binary
         run: |
           git submodule update --init --recursive
           go generate ./...
-          mkdir -p ${{ matrix.goarch }}-ollama
-          go build -o ${{ matrix.goarch }}-ollama/ollama
-          cp llm/llama.cpp/ggml/build/bin/server ${{ matrix.goarch }}-ollama
+          mkdir -p linux-amd64-ollama
+          go build -o linux-amd64-ollama/ollama
 
       - name: Zip the build
-        run: zip -r ${{ matrix.goarch }}-ollama.zip ${{ matrix.goarch }}-ollama/
+        run: zip -r linux-amd64-ollama.zip linux-amd64-ollama/
 
       - run: |
           TAG_NAME=${GITHUB_REF#refs/tags/}
           gh release view ${TAG_NAME} || exit 1
-          gh release upload ${TAG_NAME} ${{ matrix.goarch }}-ollama.zip
+          gh release upload ${TAG_NAME} linux-amd64-ollama.zip
         env:
           GH_TOKEN: ${{ github.token }}

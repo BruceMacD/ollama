@@ -32,14 +32,13 @@ jobs:
           git submodule update --init --recursive
           go generate ./...
           go build -o ${{ matrix.goarch }}/ollama
-
-      - uses: actions/upload-artifact@v3
-        with:
-          name: ollama-linux-${{ matrix.goarch }}
-          path: ${{ matrix.goarch }}/ollama
+      # - uses: actions/upload-artifact@v3
+      #   with:
+      #     name: ollama-linux-${{ matrix.goarch }}
+      #     path: ${{ matrix.goarch }}/ollama
       - run: |
           TAG_NAME=${GITHUB_REF#refs/tags/}
           gh release view ${TAG_NAME} || exit 1
-          gh release upload ${TAG_NAME} ${{ matrix.goarch }}/ollama
+          gh release upload ${TAG_NAME} ${{ matrix.goarch }}
         env:
           GH_TOKEN: ${{ github.token }}

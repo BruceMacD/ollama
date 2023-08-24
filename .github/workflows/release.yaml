@@ -37,12 +37,18 @@ jobs:
           name: ollama-linux-${{ matrix.goarch }}
           path: ${{ matrix.goarch }}/ollama
 
-      - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
+      # - name: Upload Release Asset
+      #   uses: actions/upload-release-asset@v1
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   with:
+      #     upload_url: ${{ github.event.release.upload_url }}
+      #     asset_path: ./${{ matrix.goarch }}/ollama
+      #     asset_name: ${{ matrix.goarch }}/ollama
+      #     asset_content_type: application/octet-stream
+      - run: |
+          # fail fast if the release does not exist
+          gh release view ${{ github.ref }} || exit 1
+          gh release upload ${{ github.ref }} *.txt *.zip *.deb *.rpm
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./${{ matrix.goarch }}/ollama
-          asset_name: ollama-linux-${{ matrix.goarch }}
-          asset_content_type: application/octet-stream
+          GH_TOKEN: ${{ github.token }}

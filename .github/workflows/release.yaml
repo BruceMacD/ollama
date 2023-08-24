@@ -6,7 +6,6 @@ on:
 
 jobs:
   linux:
-    permissions: write-all
     runs-on: ubuntu-latest
     env:
       VERSION: '0.0'
@@ -35,7 +34,10 @@ jobs:
           name: ollama-linux
           path: ollama
 
-      - name: Upload to GitHub Release
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
-          gh release upload ${{ github.ref }} ollama
+      - name: Upload binaries to release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: ollama
+          asset_name: ollama-linux
+          tag: ${{ github.ref }}

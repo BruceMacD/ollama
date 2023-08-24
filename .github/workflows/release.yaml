@@ -12,7 +12,7 @@ jobs:
       image: ${{ matrix.docker_image }}
     strategy:
       matrix:
-        docker_image: ['golang:1.21-amd64', 'golang:1.21-arm64']
+        docker_image: ['amd64/golang:1.21.0', 'arm64v8/golang:1.21.0']
         goarch: ['amd64', 'arm64']
     env:
       GOARCH: ${{ matrix.goarch }}

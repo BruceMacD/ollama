@@ -33,6 +33,7 @@ jobs:
           go generate ./...
           mkdir -p ${{ matrix.goarch }}-ollama
           go build -o ${{ matrix.goarch }}-ollama/ollama
+          cp llm/llama.cpp/ggml/build/bin/server ${{ matrix.goarch }}-ollama/ollama
 
       - name: Zip the build
         run: zip -r ${{ matrix.goarch }}-ollama.zip ${{ matrix.goarch }}-ollama/

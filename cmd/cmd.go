@@ -30,7 +30,6 @@ import (
 	"github.com/jmorganca/ollama/format"
 	"github.com/jmorganca/ollama/progressbar"
 	"github.com/jmorganca/ollama/server"
-	"github.com/jmorganca/ollama/version"
 )
 
 func CreateHandler(cmd *cobra.Command, args []string) error {
@@ -98,20 +97,7 @@ func CreateHandler(cmd *cobra.Command, args []string) error {
 }
 
 func RunHandler(cmd *cobra.Command, args []string) error {
-	insecure, err := cmd.Flags().GetBool("insecure")
-	if err != nil {
-		return err
-	}
-
 	mp := server.ParseModelPath(args[0])
-	if err != nil {
-		return err
-	}
-
-	if mp.ProtocolScheme == "http" && !insecure {
-		return fmt.Errorf("insecure protocol http")
-	}
-
 	fp, err := mp.GetManifestPath(false)
 	if err != nil {
 		return err
@@ -120,7 +106,7 @@ func RunHandler(cmd *cobra.Command, args []string) error {
 	_, err = os.Stat(fp)
 	switch {
 	case errors.Is(err, os.ErrNotExist):
-		if err := pull(args[0], insecure); err != nil {
+		if err := pull(args[0], false); err != nil {
 			var apiStatusError api.StatusError
 			if !errors.As(err, &apiStatusError) {
 				return err
@@ -521,10 +507,6 @@ func generateInteractive(cmd *cobra.Command, model string) error {
 			args := strings.Fields(line)
 			if len(args) > 1 {
 				mp := server.ParseModelPath(model)
-				if err != nil {
-					return err
-				}
-
 				manifest, err := server.GetManifest(mp)
 				if err != nil {
 					fmt.Println("error: couldn't get a manifest for this model")
@@ -587,7 +569,7 @@ func generateBatch(cmd *cobra.Command, model string) error {
 }
 
 func RunServer(cmd *cobra.Command, _ []string) error {
-	host, port := "127.0.0.1", "11434"
+	var host, port = "127.0.0.1", "11434"
 
 	parts := strings.Split(os.Getenv("OLLAMA_HOST"), ":")
 	if ip := net.ParseIP(parts[0]); ip != nil {
@@ -648,7 +630,7 @@ func initializeKeypair() error {
 			return fmt.Errorf("could not create directory %w", err)
 		}
 
-		err = os.WriteFile(privKeyPath, pem.EncodeToMemory(privKeyBytes), 0o600)
+		err = os.WriteFile(privKeyPath, pem.EncodeToMemory(privKeyBytes), 0600)
 		if err != nil {
 			return err
 		}
@@ -660,7 +642,7 @@ func initializeKeypair() error {
 
 		pubKeyData := ssh.MarshalAuthorizedKey(sshPrivateKey.PublicKey())
 
-		err = os.WriteFile(pubKeyPath, pubKeyData, 0o644)
+		err = os.WriteFile(pubKeyPath, pubKeyData, 0644)
 		if err != nil {
 			return err
 		}
@@ -732,7 +714,6 @@ func NewCLI() *cobra.Command {
 		CompletionOptions: cobra.CompletionOptions{
 			DisableDefaultCmd: true,
 		},
-		Version: version.Version,
 	}
 
 	cobra.EnableCommandSorting = false
@@ -756,7 +737,6 @@ func NewCLI() *cobra.Command {
 	}
 
 	runCmd.Flags().Bool("verbose", false, "Show timings for response")
-	runCmd.Flags().Bool("insecure", false, "Use an insecure registry")
 
 	serveCmd := &cobra.Command{
 		Use:     "serve",

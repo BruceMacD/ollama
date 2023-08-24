@@ -10,10 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"runtime"
 	"strings"
-
-	"github.com/jmorganca/ollama/version"
 )
 
 const DefaultHost = "localhost:11434"
@@ -86,21 +83,21 @@ func (c *Client) do(ctx context.Context, method, path string, reqData, respData 
 		reqBody = bytes.NewReader(data)
 	}
 
-	requestURL := c.Base.JoinPath(path)
-	request, err := http.NewRequestWithContext(ctx, method, requestURL.String(), reqBody)
+	url := c.Base.JoinPath(path).String()
+
+	req, err := http.NewRequestWithContext(ctx, method, url, reqBody)
 	if err != nil {
 		return err
 	}
 
-	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("Accept", "application/json")
-	request.Header.Set("User-Agent", fmt.Sprintf("ollama/%s (%s %s) Go/%s", version.Version, runtime.GOARCH, runtime.GOOS, runtime.Version()))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
 
 	for k, v := range c.Headers {
-		request.Header[k] = v
+		req.Header[k] = v
 	}
 
-	respObj, err := c.HTTP.Do(request)
+	respObj, err := c.HTTP.Do(req)
 	if err != nil {
 		return err
 	}
@@ -134,15 +131,13 @@ func (c *Client) stream(ctx context.Context, method, path string, data any, fn f
 		buf = bytes.NewBuffer(bts)
 	}
 
-	requestURL := c.Base.JoinPath(path)
-	request, err := http.NewRequestWithContext(ctx, method, requestURL.String(), buf)
+	request, err := http.NewRequestWithContext(ctx, method, c.Base.JoinPath(path).String(), buf)
 	if err != nil {
 		return err
 	}
 
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Accept", "application/json")
-	request.Header.Set("User-Agent", fmt.Sprintf("ollama/%s (%s %s) Go/%s", version.Version, runtime.GOARCH, runtime.GOOS, runtime.Version()))
 
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {

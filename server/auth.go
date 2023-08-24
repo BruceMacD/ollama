@@ -12,10 +12,8 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
 	"path"
-	"strconv"
 	"strings"
 	"time"
 
@@ -45,34 +43,21 @@ func generateNonce(length int) (string, error) {
 	return base64.RawURLEncoding.EncodeToString(nonce), nil
 }
 
-func (r AuthRedirect) URL() (*url.URL, error) {
-	redirectURL, err := url.Parse(r.Realm)
-	if err != nil {
-		return nil, err
-	}
-
-	values := redirectURL.Query()
-
-	values.Add("service", r.Service)
-
-	for _, s := range strings.Split(r.Scope, " ") {
-		values.Add("scope", s)
-	}
-
-	values.Add("ts", strconv.FormatInt(time.Now().Unix(), 10))
-
+func (r AuthRedirect) URL() (string, error) {
 	nonce, err := generateNonce(16)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	values.Add("nonce", nonce)
-
-	redirectURL.RawQuery = values.Encode()
-	return redirectURL, nil
+	scopes := []string{}
+	for _, s := range strings.Split(r.Scope, " ") {
+		scopes = append(scopes, fmt.Sprintf("scope=%s", s))
+	}
+	scopeStr := strings.Join(scopes, "&")
+	return fmt.Sprintf("%s?service=%s&%s&ts=%d&nonce=%s", r.Realm, r.Service, scopeStr, time.Now().Unix(), nonce), nil
 }
 
 func getAuthToken(ctx context.Context, redirData AuthRedirect, regOpts *RegistryOptions) (string, error) {
-	redirectURL, err := redirData.URL()
+	url, err := redirData.URL()
 	if err != nil {
 		return "", err
 	}
@@ -92,8 +77,16 @@ func getAuthToken(ctx context.Context, redirData AuthRedirect, regOpts *Registry
 
 	s := SignatureData{
 		Method: "GET",
-		Path:   redirectURL.String(),
+		Path:   url,
 		Data:   nil,
+	}
+
+	if !strings.HasPrefix(s.Path, "http") {
+		if regOpts.Insecure {
+			s.Path = "http://" + url
+		} else {
+			s.Path = "https://" + url
+		}
 	}
 
 	sig, err := s.Sign(rawKey)
@@ -101,9 +94,11 @@ func getAuthToken(ctx context.Context, redirData AuthRedirect, regOpts *Registry
 		return "", err
 	}
 
-	headers := make(http.Header)
-	headers.Set("Authorization", sig)
-	resp, err := makeRequest(ctx, "GET", redirectURL, headers, nil, regOpts)
+	headers := map[string]string{
+		"Authorization": sig,
+	}
+
+	resp, err := makeRequest(ctx, "GET", url, headers, nil, regOpts)
 	if err != nil {
 		log.Printf("couldn't get token: %q", err)
 	}

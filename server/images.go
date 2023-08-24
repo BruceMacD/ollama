@@ -12,12 +12,10 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
 	"path"
 	"path/filepath"
 	"reflect"
-	"runtime"
 	"strconv"
 	"strings"
 
@@ -25,7 +23,6 @@ import (
 	"github.com/jmorganca/ollama/llm"
 	"github.com/jmorganca/ollama/parser"
 	"github.com/jmorganca/ollama/vector"
-	"github.com/jmorganca/ollama/version"
 )
 
 const MaxRetries = 3
@@ -157,6 +154,7 @@ func GetManifest(mp ModelPath) (*ManifestV2, error) {
 
 func GetModel(name string) (*Model, error) {
 	mp := ParseModelPath(name)
+
 	manifest, err := GetManifest(mp)
 	if err != nil {
 		return nil, err
@@ -274,7 +272,6 @@ func CreateModel(ctx context.Context, name string, path string, fn func(resp api
 		case "model":
 			fn(api.ProgressResponse{Status: "looking for model"})
 			embed.model = c.Args
-
 			mp := ParseModelPath(c.Args)
 			mf, err := GetManifest(mp)
 			if err != nil {
@@ -289,7 +286,7 @@ func CreateModel(ctx context.Context, name string, path string, fn func(resp api
 						if err := PullModel(ctx, c.Args, &RegistryOptions{}, fn); err != nil {
 							return err
 						}
-						mf, err = GetManifest(mp)
+						mf, err = GetManifest(ParseModelPath(c.Args))
 						if err != nil {
 							return fmt.Errorf("failed to open file after pull: %v", err)
 						}
@@ -678,6 +675,7 @@ func SaveLayers(layers []*LayerReader, fn func(resp api.ProgressResponse), force
 
 func CreateManifest(name string, cfg *LayerReader, layers []*Layer) error {
 	mp := ParseModelPath(name)
+
 	manifest := ManifestV2{
 		SchemaVersion: 2,
 		MediaType:     "application/vnd.docker.distribution.manifest.v2+json",
@@ -808,14 +806,11 @@ func CreateLayer(f io.ReadSeeker) (*LayerReader, error) {
 }
 
 func CopyModel(src, dest string) error {
-	srcModelPath := ParseModelPath(src)
-	srcPath, err := srcModelPath.GetManifestPath(false)
+	srcPath, err := ParseModelPath(src).GetManifestPath(false)
 	if err != nil {
 		return err
 	}
-
-	destModelPath := ParseModelPath(dest)
-	destPath, err := destModelPath.GetManifestPath(true)
+	destPath, err := ParseModelPath(dest).GetManifestPath(true)
 	if err != nil {
 		return err
 	}
@@ -838,6 +833,7 @@ func CopyModel(src, dest string) error {
 
 func DeleteModel(name string) error {
 	mp := ParseModelPath(name)
+
 	manifest, err := GetManifest(mp)
 	if err != nil {
 		return err
@@ -917,11 +913,8 @@ func DeleteModel(name string) error {
 
 func PushModel(ctx context.Context, name string, regOpts *RegistryOptions, fn func(api.ProgressResponse)) error {
 	mp := ParseModelPath(name)
-	fn(api.ProgressResponse{Status: "retrieving manifest"})
 
-	if mp.ProtocolScheme == "http" && !regOpts.Insecure {
-		return fmt.Errorf("insecure protocol http")
-	}
+	fn(api.ProgressResponse{Status: "retrieving manifest"})
 
 	manifest, err := GetManifest(mp)
 	if err != nil {
@@ -962,8 +955,8 @@ func PushModel(ctx context.Context, name string, regOpts *RegistryOptions, fn fu
 			return err
 		}
 
-		if strings.HasPrefix(path.Base(location.Path), "sha256:") {
-			layer.Digest = path.Base(location.Path)
+		if strings.HasPrefix(path.Base(location), "sha256:") {
+			layer.Digest = path.Base(location)
 			fn(api.ProgressResponse{
 				Status:    "using existing layer",
 				Digest:    layer.Digest,
@@ -980,17 +973,17 @@ func PushModel(ctx context.Context, name string, regOpts *RegistryOptions, fn fu
 	}
 
 	fn(api.ProgressResponse{Status: "pushing manifest"})
-	requestURL := mp.BaseURL()
-	requestURL = requestURL.JoinPath("v2", mp.GetNamespaceRepository(), "manifests", mp.Tag)
+	url := fmt.Sprintf("%s/v2/%s/manifests/%s", mp.Registry, mp.GetNamespaceRepository(), mp.Tag)
+	headers := map[string]string{
+		"Content-Type": "application/vnd.docker.distribution.manifest.v2+json",
+	}
 
 	manifestJSON, err := json.Marshal(manifest)
 	if err != nil {
 		return err
 	}
 
-	headers := make(http.Header)
-	headers.Set("Content-Type", "application/vnd.docker.distribution.manifest.v2+json")
-	resp, err := makeRequestWithRetry(ctx, "PUT", requestURL, headers, bytes.NewReader(manifestJSON), regOpts)
+	resp, err := makeRequestWithRetry(ctx, "PUT", url, headers, bytes.NewReader(manifestJSON), regOpts)
 	if err != nil {
 		return err
 	}
@@ -1003,10 +996,6 @@ func PushModel(ctx context.Context, name string, regOpts *RegistryOptions, fn fu
 
 func PullModel(ctx context.Context, name string, regOpts *RegistryOptions, fn func(api.ProgressResponse)) error {
 	mp := ParseModelPath(name)
-
-	if mp.ProtocolScheme == "http" && !regOpts.Insecure {
-		return fmt.Errorf("insecure protocol http")
-	}
 
 	fn(api.ProgressResponse{Status: "pulling manifest"})
 
@@ -1074,11 +1063,12 @@ func PullModel(ctx context.Context, name string, regOpts *RegistryOptions, fn fu
 }
 
 func pullModelManifest(ctx context.Context, mp ModelPath, regOpts *RegistryOptions) (*ManifestV2, error) {
-	requestURL := mp.BaseURL().JoinPath("v2", mp.GetNamespaceRepository(), "manifests", mp.Tag)
+	url := fmt.Sprintf("%s/v2/%s/manifests/%s", mp.Registry, mp.GetNamespaceRepository(), mp.Tag)
+	headers := map[string]string{
+		"Accept": "application/vnd.docker.distribution.manifest.v2+json",
+	}
 
-	headers := make(http.Header)
-	headers.Set("Accept", "application/vnd.docker.distribution.manifest.v2+json")
-	resp, err := makeRequest(ctx, "GET", requestURL, headers, nil, regOpts)
+	resp, err := makeRequest(ctx, "GET", url, headers, nil, regOpts)
 	if err != nil {
 		log.Printf("couldn't get manifest: %v", err)
 		return nil, err
@@ -1137,12 +1127,35 @@ func GetSHA256Digest(r io.Reader) (string, int) {
 	return fmt.Sprintf("sha256:%x", h.Sum(nil)), int(n)
 }
 
+type requestContextKey string
+
+func startUpload(ctx context.Context, mp ModelPath, layer *Layer, regOpts *RegistryOptions) (string, error) {
+	url := fmt.Sprintf("%s/v2/%s/blobs/uploads/", mp.Registry, mp.GetNamespaceRepository())
+	if layer.From != "" {
+		url = fmt.Sprintf("%s/v2/%s/blobs/uploads/?mount=%s&from=%s", mp.Registry, mp.GetNamespaceRepository(), layer.Digest, layer.From)
+	}
+
+	resp, err := makeRequestWithRetry(ctx, "POST", url, nil, nil, regOpts)
+	if err != nil {
+		log.Printf("couldn't start upload: %v", err)
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	// Extract UUID location from header
+	location := resp.Header.Get("Location")
+	if location == "" {
+		return "", fmt.Errorf("location header is missing in response")
+	}
+
+	return location, nil
+}
+
 // Function to check if a blob already exists in the Docker registry
 func checkBlobExistence(ctx context.Context, mp ModelPath, digest string, regOpts *RegistryOptions) (bool, error) {
-	requestURL := mp.BaseURL()
-	requestURL = requestURL.JoinPath("v2", mp.GetNamespaceRepository(), "blobs", digest)
+	url := fmt.Sprintf("%s/v2/%s/blobs/%s", mp.Registry, mp.GetNamespaceRepository(), digest)
 
-	resp, err := makeRequest(ctx, "HEAD", requestURL, nil, nil, regOpts)
+	resp, err := makeRequest(ctx, "HEAD", url, nil, nil, regOpts)
 	if err != nil {
 		log.Printf("couldn't check for blob: %v", err)
 		return false, err
@@ -1153,10 +1166,89 @@ func checkBlobExistence(ctx context.Context, mp ModelPath, digest string, regOpt
 	return resp.StatusCode == http.StatusOK, nil
 }
 
-func makeRequestWithRetry(ctx context.Context, method string, requestURL *url.URL, headers http.Header, body io.ReadSeeker, regOpts *RegistryOptions) (*http.Response, error) {
+func uploadBlobChunked(ctx context.Context, mp ModelPath, url string, layer *Layer, regOpts *RegistryOptions, fn func(api.ProgressResponse)) error {
+	// TODO allow resumability
+	// TODO allow canceling uploads via DELETE
+
+	fp, err := GetBlobsPath(layer.Digest)
+	if err != nil {
+		return err
+	}
+
+	f, err := os.Open(fp)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	var completed int64
+	chunkSize := 10 * 1024 * 1024
+
+	for {
+		chunk := int64(layer.Size) - completed
+		if chunk > int64(chunkSize) {
+			chunk = int64(chunkSize)
+		}
+
+		sectionReader := io.NewSectionReader(f, int64(completed), chunk)
+
+		headers := make(map[string]string)
+		headers["Content-Type"] = "application/octet-stream"
+		headers["Content-Length"] = strconv.Itoa(int(chunk))
+		headers["Content-Range"] = fmt.Sprintf("%d-%d", completed, completed+sectionReader.Size()-1)
+
+		resp, err := makeRequestWithRetry(ctx, "PATCH", url, headers, sectionReader, regOpts)
+		if err != nil && !errors.Is(err, io.EOF) {
+			fn(api.ProgressResponse{
+				Status:    fmt.Sprintf("error uploading chunk: %v", err),
+				Digest:    layer.Digest,
+				Total:     layer.Size,
+				Completed: int(completed),
+			})
+
+			return err
+		}
+		defer resp.Body.Close()
+
+		completed += sectionReader.Size()
+		fn(api.ProgressResponse{
+			Status:    fmt.Sprintf("uploading %s", layer.Digest),
+			Digest:    layer.Digest,
+			Total:     layer.Size,
+			Completed: int(completed),
+		})
+
+		url = resp.Header.Get("Location")
+		if completed >= int64(layer.Size) {
+			break
+		}
+	}
+
+	url = fmt.Sprintf("%s&digest=%s", url, layer.Digest)
+
+	headers := make(map[string]string)
+	headers["Content-Type"] = "application/octet-stream"
+	headers["Content-Length"] = "0"
+
+	// finish the upload
+	resp, err := makeRequest(ctx, "PUT", url, headers, nil, regOpts)
+	if err != nil {
+		log.Printf("couldn't finish upload: %v", err)
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("on finish upload registry responded with code %d: %v", resp.StatusCode, string(body))
+	}
+	return nil
+}
+
+func makeRequestWithRetry(ctx context.Context, method, url string, headers map[string]string, body io.ReadSeeker, regOpts *RegistryOptions) (*http.Response, error) {
 	var status string
 	for try := 0; try < MaxRetries; try++ {
-		resp, err := makeRequest(ctx, method, requestURL, headers, body, regOpts)
+		resp, err := makeRequest(ctx, method, url, headers, body, regOpts)
 		if err != nil {
 			log.Printf("couldn't start upload: %v", err)
 			return nil, err
@@ -1192,18 +1284,18 @@ func makeRequestWithRetry(ctx context.Context, method string, requestURL *url.UR
 	return nil, fmt.Errorf("max retry exceeded: %v", status)
 }
 
-func makeRequest(ctx context.Context, method string, requestURL *url.URL, headers http.Header, body io.Reader, regOpts *RegistryOptions) (*http.Response, error) {
-	if requestURL.Scheme != "http" && regOpts.Insecure {
-		requestURL.Scheme = "http"
+func makeRequest(ctx context.Context, method, url string, headers map[string]string, body io.Reader, regOpts *RegistryOptions) (*http.Response, error) {
+	if !strings.HasPrefix(url, "http") {
+		if regOpts.Insecure {
+			url = "http://" + url
+		} else {
+			url = "https://" + url
+		}
 	}
 
-	req, err := http.NewRequestWithContext(ctx, method, requestURL.String(), body)
+	req, err := http.NewRequestWithContext(ctx, method, url, body)
 	if err != nil {
 		return nil, err
-	}
-
-	if headers != nil {
-		req.Header = headers
 	}
 
 	if regOpts.Token != "" {
@@ -1212,7 +1304,9 @@ func makeRequest(ctx context.Context, method string, requestURL *url.URL, header
 		req.SetBasicAuth(regOpts.Username, regOpts.Password)
 	}
 
-	req.Header.Set("User-Agent", fmt.Sprintf("ollama/%s (%s %s) Go/%s", version.Version, runtime.GOARCH, runtime.GOOS, runtime.Version()))
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
 
 	client := &http.Client{
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {

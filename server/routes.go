@@ -27,20 +27,6 @@ import (
 	"github.com/jmorganca/ollama/vector"
 )
 
-var mode string = gin.DebugMode
-
-func init() {
-	switch mode {
-	case gin.DebugMode:
-	case gin.ReleaseMode:
-	case gin.TestMode:
-	default:
-		mode = gin.DebugMode
-	}
-
-	gin.SetMode(mode)
-}
-
 var loaded struct {
 	mu sync.Mutex
 
@@ -379,7 +365,6 @@ func ListModelsHandler(c *gin.Context) {
 				return nil
 			}
 			tag := path[:slashIndex] + ":" + path[slashIndex+1:]
-
 			mp := ParseModelPath(tag)
 			manifest, err := GetManifest(mp)
 			if err != nil {

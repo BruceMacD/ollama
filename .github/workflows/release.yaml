@@ -1,9 +1,8 @@
 name: Release
 
 on:
-  create:
-    tags:
-      - '*'
+  release:
+    types: [published]
 
 jobs:
   linux:
@@ -30,14 +29,9 @@ jobs:
           go generate ./...
           go build -o ollama
 
-      - name: Install GitHub CLI
-        run: |
-          sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-key C99B11DEB97541F0
-          sudo apt-add-repository https://cli.github.com/packages
-          sudo apt update
-          sudo apt install gh
-
-      - name: Upload Binary to Release
-        run: |
-          echo ${{ secrets.GITHUB_TOKEN }} | gh auth login --with-token
-          gh release upload ${{ github.ref }} ollama
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}

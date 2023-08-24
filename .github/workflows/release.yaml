@@ -35,12 +35,7 @@ jobs:
           name: ollama-linux
           path: ollama
 
-      - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./ollama
-          asset_name: ollama-linux
-          asset_content_type: application/octet-stream
+      - name: Upload to GitHub Release
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+          gh release upload ${{ github.ref }} ollama

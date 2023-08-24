@@ -6,6 +6,7 @@ on:
 
 jobs:
   linux:
+    permissions: write-all
     runs-on: ubuntu-latest
     env:
       VERSION: '0.0'

@@ -6,6 +6,7 @@ on:
 
 jobs:
   linux:
+    permissions: write-all
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -49,6 +50,6 @@ jobs:
       - run: |
           # fail fast if the release does not exist
           gh release view ${{ github.ref }} || exit 1
-          gh release upload ${{ github.ref }} *.txt *.zip *.deb *.rpm
+          gh release upload ${{ github.ref }} ${{ matrix.goarch }}/ollama
         env:
           GH_TOKEN: ${{ github.token }}

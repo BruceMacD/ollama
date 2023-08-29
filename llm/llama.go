@@ -20,26 +20,13 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/jmorganca/ollama/api"
 )
 
-const ModelFamilyLlama ModelFamily = "llama"
-
-//go:embed llama.cpp/ggml/build/*/bin/*
+//go:embed llama.cpp/*/build/*/bin/*
 var llamaCppEmbed embed.FS
-
-var (
-	ggmlGPU = path.Join("llama.cpp", "ggml", "build", "gpu", "bin")
-	ggmlCPU = path.Join("llama.cpp", "ggml", "build", "cpu", "bin")
-)
-
-var (
-	ggmlInit       sync.Once
-	ggmlRunnerPath string
-)
 
 func osPath(llamaPath string) string {
 	if runtime.GOOS == "windows" {
@@ -49,67 +36,66 @@ func osPath(llamaPath string) string {
 	return llamaPath
 }
 
-func initGGML() {
-	ggmlInit.Do(func() {
-		tmpDir, err := os.MkdirTemp("", "llama-*")
-		if err != nil {
-			log.Fatalf("llama.cpp: failed to create temp dir: %v", err)
-		}
+func chooseRunner(gpuPath, cpuPath string) string {
+	tmpDir, err := os.MkdirTemp("", "llama-*")
+	if err != nil {
+		log.Fatalf("llama.cpp: failed to create temp dir: %v", err)
+	}
 
-		llamaPath := osPath(ggmlGPU)
+	llamaPath := osPath(gpuPath)
+	if _, err := fs.Stat(llamaCppEmbed, llamaPath); err != nil {
+		llamaPath = osPath(cpuPath)
 		if _, err := fs.Stat(llamaCppEmbed, llamaPath); err != nil {
-			llamaPath = osPath(ggmlCPU)
-			if _, err := fs.Stat(llamaCppEmbed, llamaPath); err != nil {
-				log.Fatalf("llama.cpp executable not found")
-			}
+			log.Fatalf("llama.cpp executable not found")
 		}
+	}
 
-		files := []string{"server"}
-		switch runtime.GOOS {
-		case "windows":
-			files = []string{"server.exe"}
-		case "darwin":
-			if llamaPath == osPath(ggmlGPU) {
-				files = append(files, "ggml-metal.metal")
-			}
+	files := []string{"server"}
+	switch runtime.GOOS {
+	case "windows":
+		files = []string{"server.exe"}
+	case "darwin":
+		if llamaPath == osPath(gpuPath) {
+			files = append(files, "ggml-metal.metal")
 		}
-
-		for _, f := range files {
-			srcPath := path.Join(llamaPath, f)
-			destPath := filepath.Join(tmpDir, f)
-
-			srcFile, err := llamaCppEmbed.Open(srcPath)
-			if err != nil {
-				log.Fatalf("read llama.cpp %s: %v", f, err)
-			}
-			defer srcFile.Close()
-
-			destFile, err := os.OpenFile(destPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o755)
-			if err != nil {
-				log.Fatalf("write llama.cpp %s: %v", f, err)
-			}
-			defer destFile.Close()
-
-			if _, err := io.Copy(destFile, srcFile); err != nil {
-				log.Fatalf("copy llama.cpp %s: %v", f, err)
-			}
+	case "linux":
+		// check if there is a GPU available
+		if _, err := CheckVRAM(); errors.Is(err, errNoGPU) {
+			// this error was logged on start-up, so we don't need to log it again
+			llamaPath = osPath(cpuPath)
 		}
+	}
 
-		ggmlRunnerPath = filepath.Join(tmpDir, "server")
-		if runtime.GOOS == "windows" {
-			ggmlRunnerPath = filepath.Join(tmpDir, "server.exe")
+	for _, f := range files {
+		srcPath := path.Join(llamaPath, f)
+		destPath := filepath.Join(tmpDir, f)
+
+		srcFile, err := llamaCppEmbed.Open(srcPath)
+		if err != nil {
+			log.Fatalf("read llama.cpp %s: %v", f, err)
 		}
-	})
+		defer srcFile.Close()
+
+		destFile, err := os.OpenFile(destPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o755)
+		if err != nil {
+			log.Fatalf("write llama.cpp %s: %v", f, err)
+		}
+		defer destFile.Close()
+
+		if _, err := io.Copy(destFile, srcFile); err != nil {
+			log.Fatalf("copy llama.cpp %s: %v", f, err)
+		}
+	}
+
+	runPath := filepath.Join(tmpDir, "server")
+	if runtime.GOOS == "windows" {
+		runPath = filepath.Join(tmpDir, "server.exe")
+	}
+
+	return runPath
 }
 
-type ModelRunner struct {
-	Path string // path to the model runner executable
-}
-
-func ggmlRunner() ModelRunner {
-	initGGML()
-	return ModelRunner{Path: ggmlRunnerPath}
-}
+const ModelFamilyLlama ModelFamily = "llama"
 
 type llamaModel struct {
 	hyperparameters llamaHyperparameters
@@ -229,9 +215,74 @@ type Running struct {
 	Cancel context.CancelFunc
 }
 
+type ModelRunner struct {
+	Path string // path to the model runner executable
+}
+
 type llama struct {
 	api.Options
 	Running
+}
+
+var errNoGPU = errors.New("nvidia-smi command failed")
+
+// CheckVRAM returns the available VRAM in MiB on Linux machines with NVIDIA GPUs
+func CheckVRAM() (int, error) {
+	cmd := exec.Command("nvidia-smi", "--query-gpu=memory.free", "--format=csv,noheader,nounits")
+	var stdout bytes.Buffer
+	cmd.Stdout = &stdout
+	err := cmd.Run()
+	if err != nil {
+		return 0, errNoGPU
+	}
+
+	// extract the available VRAM from the output
+	output := strings.TrimSpace(stdout.String())
+	vram, err := strconv.Atoi(output)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse available VRAM: %v", err)
+	}
+
+	return vram, nil
+}
+
+func NumGPU(opts api.Options) int {
+	if opts.NumGPU != -1 {
+		return opts.NumGPU
+	}
+	n := 1 // default to enable metal on macOS
+	if runtime.GOOS == "linux" {
+		vram, err := CheckVRAM()
+		if err != nil {
+			if err.Error() != "nvidia-smi command failed" {
+				log.Print(err.Error())
+			}
+			// nvidia driver not installed or no nvidia GPU found
+			return 0
+		}
+		// TODO: this is a very rough heuristic, better would be to calculate this based on number of layers and context size
+		switch {
+		case vram < 500:
+			log.Printf("WARNING: Low VRAM detected, disabling GPU")
+			n = 0
+		case vram < 1000:
+			n = 4
+		case vram < 2000:
+			n = 8
+		case vram < 4000:
+			n = 12
+		case vram < 8000:
+			n = 16
+		case vram < 12000:
+			n = 24
+		case vram < 16000:
+			n = 32
+		default:
+			n = 48
+		}
+		log.Printf("%d MB VRAM available, loading %d GPU layers", vram, n)
+	}
+	return n
 }
 
 func newLlama(model string, adapters []string, runner ModelRunner, opts api.Options) (*llama, error) {
@@ -250,12 +301,15 @@ func newLlama(model string, adapters []string, runner ModelRunner, opts api.Opti
 	params := []string{
 		"--model", model,
 		"--ctx-size", fmt.Sprintf("%d", opts.NumCtx),
-		"--gqa", fmt.Sprintf("%d", opts.NumGQA),
 		"--rope-freq-base", fmt.Sprintf("%f", opts.RopeFrequencyBase),
 		"--rope-freq-scale", fmt.Sprintf("%f", opts.RopeFrequencyScale),
 		"--batch-size", fmt.Sprintf("%d", opts.NumBatch),
-		"--n-gpu-layers", fmt.Sprintf("%d", opts.NumGPU),
+		"--n-gpu-layers", fmt.Sprintf("%d", NumGPU(opts)),
 		"--embedding",
+	}
+
+	if opts.NumGQA > 0 {
+		params = append(params, "--gqa", fmt.Sprintf("%d", opts.NumGQA))
 	}
 
 	if len(adapters) > 0 {
@@ -289,10 +343,17 @@ func newLlama(model string, adapters []string, runner ModelRunner, opts api.Opti
 			runner.Path,
 			append(params, "--port", strconv.Itoa(port))...,
 		)
+
 		cmd.Stdout = os.Stderr
 		cmd.Stderr = os.Stderr
 
 		llm := &llama{Options: opts, Running: Running{Port: port, Cmd: cmd, Cancel: cancel}}
+
+		log.Print("starting llama.cpp server")
+		if err := llm.Cmd.Start(); err != nil {
+			log.Printf("error starting the external llama.cpp server: %v", err)
+			continue
+		}
 
 		if err := waitForServer(llm); err != nil {
 			log.Printf("error starting llama.cpp server: %v", err)
@@ -300,6 +361,7 @@ func newLlama(model string, adapters []string, runner ModelRunner, opts api.Opti
 			// try again
 			continue
 		}
+
 		// server started successfully
 		return llm, nil
 	}
@@ -308,48 +370,31 @@ func newLlama(model string, adapters []string, runner ModelRunner, opts api.Opti
 }
 
 func waitForServer(llm *llama) error {
-	log.Print("starting llama.cpp server")
-	var stderr bytes.Buffer
-	llm.Cmd.Stderr = &stderr
-	err := llm.Cmd.Start()
-	if err != nil {
-		return fmt.Errorf("error starting the external llama.cpp server: %w", err)
-	}
-
-	exitChan := make(chan error, 1)
-
-	// the server is a long running process, watch for it exiting to keep track of something going wrong
-	go func() {
-		err := llm.Cmd.Wait()
-		log.Print(stderr.String())
-		exitChan <- err
-	}()
-
 	// wait for the server to start responding
 	start := time.Now()
-	expiresAt := time.Now().Add(30 * time.Second)
-	ticker := time.NewTicker(100 * time.Millisecond)
+	expiresAt := time.Now().Add(45 * time.Second)
+	ticker := time.NewTicker(200 * time.Millisecond)
 
 	log.Print("waiting for llama.cpp server to start responding")
+	for range ticker.C {
+		if time.Now().After(expiresAt) {
+			return fmt.Errorf("llama.cpp server did not start within alloted time, retrying")
+		}
 
-	for {
-		select {
-		case <-ticker.C:
-			if time.Now().After(expiresAt) {
-				return fmt.Errorf("llama.cpp server did not start responding within 30 seconds, retrying")
-			}
-			if err := llm.Ping(context.Background()); err == nil {
-				log.Printf("llama.cpp server started in %f seconds", time.Since(start).Seconds())
-				return nil
-			}
-		case err := <-exitChan:
-			return fmt.Errorf("llama.cpp server exited unexpectedly: %w", err)
+		if err := llm.Ping(context.Background()); err == nil {
+			break
 		}
 	}
+
+	log.Printf("llama.cpp server started in %f seconds", time.Since(start).Seconds())
+	return nil
 }
 
 func (llm *llama) Close() {
-	llm.Running.Cmd.Cancel()
+	llm.Cancel()
+	if err := llm.Cmd.Wait(); err != nil {
+		log.Printf("llama.cpp server exited with error: %v", err)
+	}
 }
 
 func (llm *llama) SetOptions(opts api.Options) {
@@ -676,7 +721,7 @@ func (llm *llama) Embedding(ctx context.Context, input string) ([]float64, error
 
 // Ping checks that the server subprocess is still running and responding to requests
 func (llm *llama) Ping(ctx context.Context) error {
-	resp, err := http.Head(fmt.Sprintf("http://127.0.0.1:%d", llm.Running.Port))
+	resp, err := http.Head(fmt.Sprintf("http://127.0.0.1:%d", llm.Port))
 	if err != nil {
 		return fmt.Errorf("ping resp: %w", err)
 	}

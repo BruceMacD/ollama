@@ -8,6 +8,8 @@ jobs:
   build:
     strategy:
       matrix:
+        # cuda: ['12.1.0', '11.7.1']
+        cuda: ['12.1.0']
         os:
           - ubuntu-latest
         arch:
@@ -28,6 +30,11 @@ jobs:
             'ARM') echo 'arm' ;;
             'ARM64') echo 'arm64' ;;
           esac | xargs -I{} echo 'GOARCH={}' | tee -a $GITHUB_ENV
+
+      - uses: Jimver/cuda-toolkit@v0.2.10
+        id: cuda-toolkit
+        with:
+          cuda: ${{ matrix.cuda }}
 
       - uses: actions/checkout@v3
         with:
@@ -65,10 +72,3 @@ jobs:
             '-ldflags=-w -s
               "-X=github.com/brucemacd/ollama/version.Version=${{ github.ref_name }}"
               "-X=github.com/brucemacd/ollama/server.mode=release"'
-
-      - run: |
-          TAG_NAME=${GITHUB_REF#refs/tags/}
-          gh release view ${TAG_NAME} || exit 1
-          gh release upload ${TAG_NAME} ollama-$GOOS-$GOARCH.zip
-        env:
-          GH_TOKEN: ${{ github.token }}

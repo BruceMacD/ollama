@@ -67,7 +67,8 @@ jobs:
               "-X=github.com/brucemacd/ollama/server.mode=release"'
 
       - run: |
-          gh release view $GITHUB_REF_NAME || exit 1
-          gh release upload $GITHUB_REF_NAME *.zip
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          gh release view ${TAG_NAME} || exit 1
+          gh release upload ${TAG_NAME} ollama-$GOOS-$GOARCH.zip
         env:
           GH_TOKEN: ${{ github.token }}

@@ -35,6 +35,7 @@ jobs:
         id: cuda-toolkit
         with:
           cuda: ${{ matrix.cuda }}
+          cache: true
 
       - uses: actions/checkout@v3
         with:
@@ -72,3 +73,9 @@ jobs:
             '-ldflags=-w -s
               "-X=github.com/brucemacd/ollama/version.Version=${{ github.ref_name }}"
               "-X=github.com/brucemacd/ollama/server.mode=release"'
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: ollama-${{ env.GOOS }}-${{ env.GOARCH }}
+          path: ollama-${{ env.GOOS }}-${{ env.GOARCH }}.zip

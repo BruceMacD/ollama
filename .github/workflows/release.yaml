@@ -11,7 +11,7 @@ jobs:
         # cuda: ['12.1.0', '11.7.1']
         cuda: ['12.1.0']
         os:
-          - ubuntu-latest
+          - ubuntu-20.04
         arch:
           - amd64
 
@@ -35,7 +35,7 @@ jobs:
         id: cuda-toolkit
         with:
           cuda: ${{ matrix.cuda }}
-          cache: true
+          use-github-cache: true
 
       - uses: actions/checkout@v3
         with:

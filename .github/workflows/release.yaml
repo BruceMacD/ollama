@@ -8,8 +8,7 @@ jobs:
   build:
     strategy:
       matrix:
-        # cuda: ['12.1.0', '11.7.1']
-        cuda: ['11.7.1']
+        cuda: ['12.1.0', '11.7.1']
         os:
           - ubuntu-20.04
         arch:

@@ -14,9 +14,8 @@ jobs:
     steps:
       - uses: jimver/cuda-toolkit@v0.2.11
         with:
-          cuda: '12.2.0'
-          linux-local-args: '["--toolkit"]'
-          use-github-cache: true
+          cuda: '12.1.0'
+          method: network
       - uses: actions/checkout@v3
         with:
           submodules: recursive

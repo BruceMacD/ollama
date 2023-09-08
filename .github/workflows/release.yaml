@@ -46,9 +46,11 @@ jobs:
       - uses: jimver/cuda-toolkit@v0.2.10
         with:
           cuda: '11.7.0'
-          method: 'network'
-          sub-packages: '["nvcc", "cublas-cu11"]'
           use-github-cache: true
+
+      - name: List installed CUDA packages
+        run: |
+          dpkg -l | grep cuda
 
       - uses: actions/checkout@v3
         with:

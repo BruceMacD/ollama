@@ -12,9 +12,9 @@ jobs:
   cuda12-build:
     runs-on: ubuntu-20.04
     steps:
-      - uses: jimver/cuda-toolkit@v0.2.10
+      - uses: jimver/cuda-toolkit@v0.2.11
         with:
-          cuda: '12.1.0'
+          cuda: '12.2.0'
           linux-local-args: '["--toolkit"]'
           use-github-cache: true
       - uses: actions/checkout@v3

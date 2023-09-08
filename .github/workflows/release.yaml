@@ -47,7 +47,7 @@ jobs:
         with:
           cuda: '11.7.0'
           method: 'network'
-          sub-packages: '["nvcc", "cublas"]'
+          sub-packages: '["nvcc", "cublas-cu11"]'
           use-github-cache: true
 
       - uses: actions/checkout@v3

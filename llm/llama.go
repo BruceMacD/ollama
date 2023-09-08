@@ -83,10 +83,9 @@ func chooseRunner(runnerType string) string {
 		}
 
 		switch cudaVersion {
-		case 11:
-			llamaPath = osPath(path.Join("llama.cpp", runnerType, "build", "gpu", "bin"))
-		case 12:
-			llamaPath = osPath(path.Join("llama.cpp", runnerType, "build", "gpu", "bin"))
+		case 11, 12:
+			cudaDir := fmt.Sprintf("cuda-%d", cudaVersion)
+			llamaPath = osPath(path.Join("llama.cpp", runnerType, "build", cudaDir, "bin"))
 		default:
 			if cudaVersion != -1 {
 				// a valid version was returned but it is not supported

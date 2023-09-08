@@ -1,0 +1,81 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        cuda: ['12.1.0', '11.7.1']
+        os:
+          - ubuntu-20.04
+        arch:
+          - amd64
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - run: |
+          case "${{ runner.os }}" in
+            'Linux') echo 'linux' ;;
+            'Windows') echo 'windows' ;;
+            'macOS') echo 'darwin' ;;
+          esac | xargs -I{} echo 'GOOS={}' | tee -a $GITHUB_ENV
+
+          case "${{ runner.arch }}" in
+            'X86') echo 'i386' ;;
+            'X64') echo 'amd64' ;;
+            'ARM') echo 'arm' ;;
+            'ARM64') echo 'arm64' ;;
+          esac | xargs -I{} echo 'GOARCH={}' | tee -a $GITHUB_ENV
+
+      - uses: Jimver/cuda-toolkit@v0.2.10
+        id: cuda-toolkit
+        with:
+          cuda: ${{ matrix.cuda }}
+          use-github-cache: true
+
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Setup Go environment
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.21
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake
+          nvidia-smi
+        if: ${{ runner.os == 'Linux' }}
+
+      # - name: Install macOS build dependencies
+      #   run: |
+      #     brew update
+      #     brew install cmake
+      #   if: ${{ runner.os == 'macOS' }}
+
+      # - name: Install Windows build dependencies
+      #   run: |
+      #     choco install mingw cmake
+      #   if: ${{ runner.os == 'Windows' }}
+
+      - run: |
+          go generate ./...
+          go build -o ollama-$GOOS-$GOARCH
+          zip ollama-$GOOS-$GOARCH.zip ollama-$GOOS-$GOARCH
+        env:
+          CGO_ENABLED: 1
+          GOFLAGS: >-
+            '-ldflags=-w -s
+              "-X=github.com/brucemacd/ollama/version.Version=${{ github.ref_name }}"
+              "-X=github.com/brucemacd/ollama/server.mode=release"'
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: ollama-${{ env.GOOS }}-${{ env.GOARCH }}
+          path: ollama-${{ env.GOOS }}-${{ env.GOARCH }}.zip

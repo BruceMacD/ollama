@@ -43,10 +43,11 @@ jobs:
   cuda11-build:
     runs-on: ubuntu-20.04
     steps:
-      - name: Setup CUDA 11
-        uses: Jimver/cuda-toolkit@v0.2.10
+      - uses: jimver/cuda-toolkit@v0.2.10
         with:
           cuda: '11.7.0'
+          method: 'network'
+          sub-packages: '[ "nvcc" ]'
           use-github-cache: true
 
       - uses: actions/checkout@v3

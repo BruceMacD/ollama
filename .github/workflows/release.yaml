@@ -9,73 +9,73 @@ on:
       - main
 
 jobs:
-  # cuda12-build:
+  cuda12-build:
+  runs-on: ubuntu-20.04
+  steps:
+    - uses: jimver/cuda-toolkit@v0.2.10
+      with:
+        cuda: '121.1.0'
+        linux-local-args: '["--toolkit"]'
+        use-github-cache: true
+    - uses: actions/checkout@v3
+      with:
+        submodules: recursive
+    - name: Setup Go environment
+      uses: actions/setup-go@v4
+      with:
+        go-version: 1.21
+    - name: Install Linux build dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake
+        nvcc --version
+    - name: Generate CUDA 12 runners
+      run: |
+        go generate ./...
+    - name: Zip and upload CUDA 12 output
+      run: |
+        zip -r cuda-12.zip ./llm/llama.cpp
+    - uses: actions/upload-artifact@v2
+      with:
+        name: cuda-12.zip
+        path: cuda-12.zip
+
+  # cuda11-build:
   #   runs-on: ubuntu-20.04
   #   steps:
-  #     - name: Setup CUDA 12
-  #       uses: Jimver/cuda-toolkit@v0.2.10
+  #     - uses: jimver/cuda-toolkit@v0.2.10
   #       with:
-  #         cuda: '12.1.0'
+  #         cuda: '11.7.0'
+  #         linux-local-args: '["--toolkit"]'
   #         use-github-cache: true
+
   #     - uses: actions/checkout@v3
   #       with:
   #         submodules: recursive
+
   #     - name: Setup Go environment
   #       uses: actions/setup-go@v4
   #       with:
   #         go-version: 1.21
+
   #     - name: Install Linux build dependencies
   #       run: |
   #         sudo apt-get update
   #         sudo apt-get install -y build-essential cmake
   #         nvcc --version
-  #     - name: Generate CUDA 12 runners
+
+  #     - name: Generate CUDA 11 runners
   #       run: |
   #         go generate ./...
-  #     - name: Zip and upload CUDA 12 output
+
+  #     - name: Zip and upload CUDA 11 output
   #       run: |
-  #         zip -r cuda-12.zip ./llm/llama.cpp
-  #       - uses: actions/upload-artifact@v2
+  #         zip -r cuda-11.zip ./llm/llama.cpp
+
+  #     - uses: actions/upload-artifact@v2
   #       with:
-  #         name: cuda-12.zip
-  #         path: cuda-12.zip
-
-  cuda11-build:
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: jimver/cuda-toolkit@v0.2.10
-        with:
-          cuda: '11.7.0'
-          linux-local-args: '["--silent", "--toolkit"]'
-          use-github-cache: true
-
-      - uses: actions/checkout@v3
-        with:
-          submodules: recursive
-
-      - name: Setup Go environment
-        uses: actions/setup-go@v4
-        with:
-          go-version: 1.21
-
-      - name: Install Linux build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential cmake
-          nvcc --version
-
-      - name: Generate CUDA 11 runners
-        run: |
-          go generate ./...
-
-      - name: Zip and upload CUDA 11 output
-        run: |
-          zip -r cuda-11.zip ./llm/llama.cpp
-
-      - uses: actions/upload-artifact@v2
-        with:
-          name: cuda-11.zip
-          path: cuda-11.zip
+  #         name: cuda-11.zip
+  #         path: cuda-11.zip
 
   # go-build:
   #   needs: [cuda12-build, cuda11-build]

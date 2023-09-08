@@ -5,78 +5,109 @@ on:
     types: [published]
 
 jobs:
-  build:
-    strategy:
-      matrix:
-        # cuda: ['12.1.0', '11.7.1']
-        cuda: ['12.1.0']
-        os:
-          - ubuntu-20.04
-        arch:
-          - amd64
-
-    runs-on: ${{ matrix.os }}
+  # cuda12-build:
+  #   runs-on: ubuntu-20.04
+  #   steps:
+  #     - name: Setup CUDA 12
+  #       uses: Jimver/cuda-toolkit@v0.2.10
+  #       with:
+  #         cuda: '12.1.0'
+  #         use-github-cache: true
+  #     - uses: actions/checkout@v3
+  #       with:
+  #         submodules: recursive
+  #     - name: Setup Go environment
+  #       uses: actions/setup-go@v4
+  #       with:
+  #         go-version: 1.21
+  #     - name: Install Linux build dependencies
+  #       run: |
+  #         sudo apt-get update
+  #         sudo apt-get install -y build-essential cmake
+  #         nvcc --version
+  #     - name: Generate CUDA 12 runners
+  #       run: |
+  #         go generate ./...
+  #     - name: Zip and upload CUDA 12 output
+  #       run: |
+  #         zip -r cuda-12.zip ./llm/llama.cpp
+  #       - uses: actions/upload-artifact@v2
+  #       with:
+  #         name: cuda-12.zip
+  #         path: cuda-12.zip
+          
+  cuda11-build:
+    runs-on: ubuntu-20.04
     steps:
-      - run: |
-          case "${{ runner.os }}" in
-            'Linux') echo 'linux' ;;
-            'Windows') echo 'windows' ;;
-            'macOS') echo 'darwin' ;;
-          esac | xargs -I{} echo 'GOOS={}' | tee -a $GITHUB_ENV
-
-          case "${{ runner.arch }}" in
-            'X86') echo 'i386' ;;
-            'X64') echo 'amd64' ;;
-            'ARM') echo 'arm' ;;
-            'ARM64') echo 'arm64' ;;
-          esac | xargs -I{} echo 'GOARCH={}' | tee -a $GITHUB_ENV
-
-      - uses: Jimver/cuda-toolkit@v0.2.10
-        id: cuda-toolkit
+      - name: Setup CUDA 11
+        uses: Jimver/cuda-toolkit@v0.2.10
         with:
-          cuda: ${{ matrix.cuda }}
+          cuda: '11.7.0'
           use-github-cache: true
-
       - uses: actions/checkout@v3
         with:
           submodules: recursive
-
       - name: Setup Go environment
         uses: actions/setup-go@v4
         with:
           go-version: 1.21
-
       - name: Install Linux build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential cmake
           nvcc --version
-        if: ${{ runner.os == 'Linux' }}
-
-      # - name: Install macOS build dependencies
-      #   run: |
-      #     brew update
-      #     brew install cmake
-      #   if: ${{ runner.os == 'macOS' }}
-
-      # - name: Install Windows build dependencies
-      #   run: |
-      #     choco install mingw cmake
-      #   if: ${{ runner.os == 'Windows' }}
-
-      - run: |
+      - name: Generate CUDA 11 runners
+        run: |
           go generate ./...
-          go build -o ollama-$GOOS-$GOARCH
-          zip ollama-$GOOS-$GOARCH.zip ollama-$GOOS-$GOARCH
-        env:
-          CGO_ENABLED: 1
-          GOFLAGS: >-
-            '-ldflags=-w -s
-              "-X=github.com/brucemacd/ollama/version.Version=${{ github.ref_name }}"
-              "-X=github.com/brucemacd/ollama/server.mode=release"'
-
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v2
+      - name: Zip and upload CUDA 11 output
+        run: |
+          zip -r cuda-11.zip ./llm/llama.cpp
+        - uses: actions/upload-artifact@v2
         with:
-          name: ollama-${{ env.GOOS }}-${{ env.GOARCH }}
-          path: ollama-${{ env.GOOS }}-${{ env.GOARCH }}.zip
+          name: cuda-11.zip
+          path: cuda-11.zip
+
+  # go-build:
+  #   needs: [cuda12-build, cuda11-build]
+  #   runs-on: ubuntu-20.04
+  #   steps:
+  #     # Download and unzip CUDA 12 output
+  #     - name: Download CUDA 12 output
+  #       uses: actions/download-artifact@v2
+  #       with:
+  #         name: cuda-12.zip
+  #     - run: unzip cuda-12.zip -d ./llama.cpp/ggml/build/cuda-12/bin
+
+  #     # Download and unzip CUDA 11 output
+  #     - name: Download CUDA 11 output
+  #       uses: actions/download-artifact@v2
+  #       with:
+  #         name: cuda-11.zip
+  #     - run: unzip cuda-11-output.zip -d ./llama.cpp/ggml/build/cuda-11/bin
+
+  #     - name: Checkout Code
+  #       uses: actions/checkout@v3
+  #     - name: Setup Go environment
+  #       uses: actions/setup-go@v4
+  #       with:
+  #         go-version: 1.21
+
+  #     - name: Move outputs and run go build
+  #       run: |
+  #         # Move outputs from previous jobs into a directory
+  #         mkdir output_directory
+  #         mv output_from_cuda12 output_directory/
+  #         mv output_from_cuda11 output_directory/
+  #         # Run go build
+  #         go generate ./...
+  #         go build -o ollama
+  #       env:
+  #         GOFLAGS: >-
+  #           '-ldflags=-w -s
+  #             "-X=github.com/brucemacd/ollama/version.Version=${{ github.ref_name }}"
+
+  #     - name: Upload build artifact
+  #       uses: actions/upload-artifact@v2
+  #       with:
+  #         name: ollama-amd64
+  #         path: ollama-amd64

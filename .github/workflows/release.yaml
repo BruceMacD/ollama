@@ -34,7 +34,7 @@ jobs:
       - name: Prepare CUDA output for upload
         run: |
           mkdir -p artifact-${{ matrix.cuda }}
-          cp -r ./llm/llama.cpp/*/build/* artifact-${{ matrix.cuda }}
+          cp -r ./llm/llama.cpp artifact-${{ matrix.cuda }}
       - uses: actions/upload-artifact@v2
         with:
           name: cuda-${{ matrix.cuda }}
@@ -65,8 +65,7 @@ jobs:
       - run: |
           mkdir -p ./llm/llama.cpp/ggml/build/cuda-11/bin
           mkdir -p ./llm/llama.cpp/gguf/build/cuda-11/bin
-          mv ./artifacts/llm/llama.cpp/ggml/build/cuda-11/bin/server ./llm/llama.cpp/ggml/build/cuda-11/bin/server
-          mv ./artifacts/llm/llama.cpp/gguf/build/cuda-11/bin/server ./llm/llama.cpp/gguf/build/cuda-11/bin/server
+          mv ./artifacts/gguf/build/cuda-11/bin/server ./llm/llama.cpp/gguf/build/cuda-11/bin/server
 
       - name: Package and Upload Entire Project
         run: |

@@ -34,7 +34,7 @@ jobs:
       - name: Prepare CUDA output for upload
         run: |
           mkdir -p artifact-${{ matrix.cuda }}
-          cp -r ./llm/llama.cpp/*/build/* artifact-${{ matrix.cuda }}
+          cp -r ./llm/llama.cpp/*/build/*/*/bin artifact-${{ matrix.cuda }}
       - uses: actions/upload-artifact@v2
         with:
           name: cuda-${{ matrix.cuda }}

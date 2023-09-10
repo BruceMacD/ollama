@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        cuda: '11.7.0'
+        cuda: ['11.7.0']
     steps:
       - uses: jimver/cuda-toolkit@v0.2.11
         with:

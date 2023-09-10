@@ -61,7 +61,10 @@ jobs:
           name: cuda-11.7.0
       - run: |
           unzip cuda-11.7.0 -d ./temp-cuda-11
-          mv ./temp-cuda-11/llm/llama.cpp/*/build/* ./llm/llama.cpp/ggml/build/cuda-11.7.0/bin/server
+          mkdir -p ./llm/llama.cpp/ggml/build/cuda-11.7.0/bin
+          mkdir -p ./llm/llama.cpp/gguf/build/cuda-11.7.0/bin
+          mv ./temp-cuda-11/llm/llama.cpp/ggml/build/cuda-11.7.0/bin/server ./llm/llama.cpp/ggml/build/cuda-11.7.0/bin/server
+          mv ./temp-cuda-11/llm/llama.cpp/gguf/build/cuda-11.7.0/bin/server ./llm/llama.cpp/ggml/build/cuda-11.7.0/bin/server
           rm -rf ./temp-cuda-11
 
       - name: Build with all packaged in runners

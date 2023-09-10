@@ -60,14 +60,13 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           name: cuda-11.7.0
-          path: artifacts/
+          path: ./artifacts/
+
       - run: |
-          unzip artifacts/cuda-11.7.0 -d ./temp-cuda-11
           mkdir -p ./llm/llama.cpp/ggml/build/cuda-11/bin
           mkdir -p ./llm/llama.cpp/gguf/build/cuda-11/bin
-          mv ./temp-cuda-11/llm/llama.cpp/ggml/build/cuda-11/bin/server ./llm/llama.cpp/ggml/build/cuda-11/bin/server
-          mv ./temp-cuda-11/llm/llama.cpp/gguf/build/cuda-11/bin/server ./llm/llama.cpp/gguf/build/cuda-11/bin/server
-          rm -rf ./temp-cuda-11
+          mv ./artifacts/llm/llama.cpp/ggml/build/cuda-11/bin/server ./llm/llama.cpp/ggml/build/cuda-11/bin/server
+          mv ./artifacts/llm/llama.cpp/gguf/build/cuda-11/bin/server ./llm/llama.cpp/gguf/build/cuda-11/bin/server
 
       - name: Package and Upload Entire Project
         run: |

@@ -34,50 +34,50 @@ jobs:
       - name: Prepare CUDA output for upload
         run: |
           mkdir -p artifact-${{ matrix.cuda }}
-          cp -r ./llm/llama.cpp/*/build/*/*/bin artifact-${{ matrix.cuda }}
+          cp -r ./llm/llama.cpp/*/build/* artifact-${{ matrix.cuda }}
       - uses: actions/upload-artifact@v2
         with:
           name: cuda-${{ matrix.cuda }}
           path: artifact-${{ matrix.cuda }}/
 
-  # ollama-build:
-  #   needs: [cuda-build]
-  #   runs-on: ubuntu-20.04
-  #   steps:
-  #     - name: Checkout Code
-  #       uses: actions/checkout@v3
+  ollama-build:
+    needs: [cuda-build]
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
 
-  #     - name: Setup Go environment
-  #       uses: actions/setup-go@v4
-  #       with:
-  #         go-version: 1.21
+      - name: Setup Go environment
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.21
 
-  #     - name: Generate CPU runners
-  #       run: |
-  #         go generate ./...
+      - name: Generate CPU runners
+        run: |
+          go generate ./...
 
-  #     - name: Download CUDA 11 runner
-  #       uses: actions/download-artifact@v2
-  #       with:
-  #         name: cuda-11.7.0
-  #     - run: |
-  #         unzip cuda-11.7.0 -d ./temp-cuda-11
-  #         mkdir -p ./llm/llama.cpp/ggml/build/cuda-11/bin
-  #         mkdir -p ./llm/llama.cpp/gguf/build/cuda-11/bin
-  #         mv ./temp-cuda-11/llm/llama.cpp/ggml/build/cuda-11/bin/server ./llm/llama.cpp/ggml/build/cuda-11/bin/server
-  #         mv ./temp-cuda-11/llm/llama.cpp/gguf/build/cuda-11/bin/server ./llm/llama.cpp/ggml/build/cuda-11/bin/server
-  #         rm -rf ./temp-cuda-11
+      - name: Download CUDA 11 runner
+        uses: actions/download-artifact@v2
+        with:
+          name: cuda-11.7.0
+      - run: |
+          unzip cuda-11.7.0 -d ./temp-cuda-11
+          mkdir -p ./llm/llama.cpp/ggml/build/cuda-11/bin
+          mkdir -p ./llm/llama.cpp/gguf/build/cuda-11/bin
+          mv ./temp-cuda-11/llm/llama.cpp/ggml/build/cuda-11/bin/server ./llm/llama.cpp/ggml/build/cuda-11/bin/server
+          mv ./temp-cuda-11/llm/llama.cpp/gguf/build/cuda-11/bin/server ./llm/llama.cpp/gguf/build/cuda-11/bin/server
+          rm -rf ./temp-cuda-11
 
-  #     - name: Build with all packaged in runners
-  #       run: |
-  #         go build -o ollama
-  #       env:
-  #         GOFLAGS: >-
-  #           '-ldflags=-w -s
-  #             "-X=github.com/brucemacd/ollama/version.Version=${{ github.ref_name }}"
+      - name: Build with all packaged in runners
+        run: |
+          go build -o ollama
+        env:
+          GOFLAGS: >-
+            '-ldflags=-w -s
+              "-X=github.com/brucemacd/ollama/version.Version=${{ github.ref_name }}"
 
-  #     - name: Upload build artifact
-  #       uses: actions/upload-artifact@v2
-  #       with:
-  #         name: ollama-amd64
-  #         path: ollama-amd64
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: ollama-amd64
+          path: ollama-amd64

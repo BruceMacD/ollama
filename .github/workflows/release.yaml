@@ -68,6 +68,15 @@ jobs:
           mv ./temp-cuda-11/llm/llama.cpp/gguf/build/cuda-11/bin/server ./llm/llama.cpp/gguf/build/cuda-11/bin/server
           rm -rf ./temp-cuda-11
 
+      - name: Package and Upload Entire Project
+        run: |
+          zip -r ollama-project.zip .
+        continue-on-error: true # Continue even if this step fails
+      - uses: actions/upload-artifact@v2
+        with:
+          name: ollama-project
+          path: ollama-project.zip
+
       - name: Build with all packaged in runners
         run: |
           go build -o ollama

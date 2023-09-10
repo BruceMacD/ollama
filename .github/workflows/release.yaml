@@ -58,18 +58,18 @@ jobs:
       - name: Download CUDA 12 runner
         uses: actions/download-artifact@v2
         with:
-          name: cuda-12.1.0.zip
+          name: cuda-12.1.0
       - run: |
-          unzip cuda-12.1.0.zip -d ./temp-cuda-12
+          unzip cuda-12.1.0 -d ./temp-cuda-12
           mv ./temp-cuda-12/llm/llama.cpp/*/build/* ./llama.cpp/ggml/build/cuda-12/bin/server
           rm -rf ./temp-cuda-12
 
       - name: Download CUDA 11 runner
         uses: actions/download-artifact@v2
         with:
-          name: cuda-11.7.0.zip
+          name: cuda-11.7.0
       - run: |
-          unzip cuda-11.7.0.zip -d ./temp-cuda-11
+          unzip cuda-11.7.0 -d ./temp-cuda-11
           mv ./temp-cuda-11/llm/llama.cpp/*/build/* ./llama.cpp/ggml/build/cuda-11.7.0/bin/server
           rm -rf ./temp-cuda-11
 

@@ -44,28 +44,37 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
+
       - name: Setup Go environment
         uses: actions/setup-go@v4
         with:
           go-version: 1.21
+
       - name: Generate CPU runners
         run: |
           go generate ./...
+
       - name: Download CUDA 11 runner
         uses: actions/download-artifact@v2
         with:
           name: cuda-11.7.0
           path: ./artifacts/
+
       - run: |
           tar -xzvf ./artifacts/artifact-11.7.0.tar.gz -C ./artifacts/
           ls -R ./artifacts/
           mkdir -p ./llm/llama.cpp/ggml/build/cuda-11/bin
           mkdir -p ./llm/llama.cpp/gguf/build/cuda-11/bin
           mv ./artifacts/llm/llama.cpp/gguf/build/cuda-11/bin/server ./llm/llama.cpp/gguf/build/cuda-11/bin/server
+
       - name: Build with all packaged in runners
         run: go build -o ollama -ldflags="-w -s -X github.com/brucemacd/ollama/version.Version=${{ github.ref_name }}"
+
+      - name: Package the binary
+        run: tar -czvf ollama-amd64.tar.gz ollama
+
       - name: Upload build artifact
         uses: actions/upload-artifact@v2
         with:
           name: ollama-amd64
-          path: ollama
+          path: ollama-amd64.tar.gz

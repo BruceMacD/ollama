@@ -27,18 +27,16 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential cmake
-          nvcc --version
       - name: Generate CUDA runners
         run: |
           go generate ./...
       - name: Prepare CUDA output for upload
         run: |
-          mkdir -p artifact-${{ matrix.cuda }}
-          cp -r ./llm/llama.cpp artifact-${{ matrix.cuda }}
+          tar -czvf artifact-${{ matrix.cuda }}.tar.gz ./llm/llama.cpp
       - uses: actions/upload-artifact@v2
         with:
           name: cuda-${{ matrix.cuda }}
-          path: artifact-${{ matrix.cuda }}/
+          path: artifact-${{ matrix.cuda }}.tar.gz
 
   ollama-build:
     needs: [cuda-build]
@@ -46,42 +44,27 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
-
       - name: Setup Go environment
         uses: actions/setup-go@v4
         with:
           go-version: 1.21
-
       - name: Generate CPU runners
         run: |
           go generate ./...
-
       - name: Download CUDA 11 runner
         uses: actions/download-artifact@v2
         with:
           name: cuda-11.7.0
           path: ./artifacts/
-
       - run: |
-          ls -R ./artifacts/
+          tar -xzvf ./artifacts/artifact-11.7.0.tar.gz
           mkdir -p ./llm/llama.cpp/ggml/build/cuda-11/bin
           mkdir -p ./llm/llama.cpp/gguf/build/cuda-11/bin
-          mv ./artifacts/llama.cpp/gguf/build/cuda-11/bin/server ./llm/llama.cpp/gguf/build/cuda-11/bin/server
-
-      - name: Package and Upload Entire Project
-        run: |
-          zip -r ollama-project.zip .
-
-      - uses: actions/upload-artifact@v2
-        with:
-          name: ollama-project
-          path: ollama-project.zip
-
+          mv ./llm/llama.cpp/gguf/build/cuda-11/bin/server ./llm/llama.cpp/gguf/build/cuda-11/bin/server
       - name: Build with all packaged in runners
-        run: go build -o ollama -ldflags="-w -s -X github.com/brucemacd/ollama/version.Version=main"
-
+        run: go build -o ollama -ldflags="-w -s -X github.com/brucemacd/ollama/version.Version=${{ github.ref_name }}"
       - name: Upload build artifact
         uses: actions/upload-artifact@v2
         with:
           name: ollama-amd64
-          path: ollama-amd64
+          path: ollama

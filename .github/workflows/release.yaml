@@ -78,6 +78,15 @@ jobs:
           mv ./artifacts/llm/llama.cpp/gguf/build/cuda-12/bin/server ./llm/llama.cpp/gguf/build/cuda-12/bin/server
           rm -rf ./artifacts/llm
 
+      - name: Package and Upload Entire Project
+        run: |
+          tar -czvf llm.tar.gz llm
+        continue-on-error: true # Continue even if this step fails
+      - uses: actions/upload-artifact@v2
+        with:
+          name: llm
+          path: llm.tar.gz
+
       - name: Build with all packaged in runners
         run: go build -o ollama -ldflags="-w -s -X github.com/brucemacd/ollama/version.Version=${{ github.ref_name }}"
 

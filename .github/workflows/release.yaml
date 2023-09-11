@@ -71,19 +71,14 @@ jobs:
       - name: Package and Upload Entire Project
         run: |
           zip -r ollama-project.zip .
-        continue-on-error: true # Continue even if this step fails
+
       - uses: actions/upload-artifact@v2
         with:
           name: ollama-project
           path: ollama-project.zip
 
       - name: Build with all packaged in runners
-        run: |
-          go build -o ollama
-        env:
-          GOFLAGS: >-
-            '-ldflags=-w -s
-              "-X=github.com/brucemacd/ollama/version.Version=${{ github.ref_name }}"
+        run: go build -o ollama -ldflags="-w -s -X github.com/brucemacd/ollama/version.Version=main"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v2

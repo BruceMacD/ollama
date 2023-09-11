@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        cuda: ['11.7.0']
+        cuda: ['11.7.0', '12.1.0']
     steps:
       - uses: jimver/cuda-toolkit@v0.2.11
         with:
@@ -60,12 +60,23 @@ jobs:
           name: cuda-11.7.0
           path: ./artifacts/
 
+      - name: Download CUDA 12 runner
+        uses: actions/download-artifact@v2
+        with:
+          name: cuda-12.1.0
+          path: ./artifacts/
+
       - run: |
           tar -xzvf ./artifacts/artifact-11.7.0.tar.gz -C ./artifacts/
-          ls -R ./artifacts/
           mkdir -p ./llm/llama.cpp/ggml/build/cuda-11/bin
           mkdir -p ./llm/llama.cpp/gguf/build/cuda-11/bin
           mv ./artifacts/llm/llama.cpp/gguf/build/cuda-11/bin/server ./llm/llama.cpp/gguf/build/cuda-11/bin/server
+          rm -rf ./artifacts/llm
+          tar -xzvf ./artifacts/artifact-12.1.0.tar.gz -C ./artifacts/
+          mkdir -p ./llm/llama.cpp/ggml/build/cuda-12/bin
+          mkdir -p ./llm/llama.cpp/gguf/build/cuda-12/bin
+          mv ./artifacts/llm/llama.cpp/gguf/build/cuda-12/bin/server ./llm/llama.cpp/gguf/build/cuda-12/bin/server
+          rm -rf ./artifacts/llm
 
       - name: Build with all packaged in runners
         run: go build -o ollama -ldflags="-w -s -X github.com/brucemacd/ollama/version.Version=${{ github.ref_name }}"

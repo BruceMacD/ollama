@@ -61,7 +61,7 @@ jobs:
           ls -R ./artifacts/
           mkdir -p ./llm/llama.cpp/ggml/build/cuda-11/bin
           mkdir -p ./llm/llama.cpp/gguf/build/cuda-11/bin
-          mv ./artifacts/llama.cpp/gguf/build/cuda-11/bin/server ./llm/llama.cpp/gguf/build/cuda-11/bin/server
+          mv ./artifacts/llm/llama.cpp/gguf/build/cuda-11/bin/server ./llm/llama.cpp/gguf/build/cuda-11/bin/server
       - name: Build with all packaged in runners
         run: go build -o ollama -ldflags="-w -s -X github.com/brucemacd/ollama/version.Version=${{ github.ref_name }}"
       - name: Upload build artifact

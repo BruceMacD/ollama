@@ -63,9 +63,10 @@ jobs:
           path: ./artifacts/
 
       - run: |
+          ls -R ./artifacts/
           mkdir -p ./llm/llama.cpp/ggml/build/cuda-11/bin
           mkdir -p ./llm/llama.cpp/gguf/build/cuda-11/bin
-          mv ./artifacts/gguf/build/cuda-11/bin/server ./llm/llama.cpp/gguf/build/cuda-11/bin/server
+          mv ./artifacts/llama.cpp/gguf/build/cuda-11/bin/server ./llm/llama.cpp/gguf/build/cuda-11/bin/server
 
       - name: Package and Upload Entire Project
         run: |

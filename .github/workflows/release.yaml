@@ -57,10 +57,11 @@ jobs:
           name: cuda-11.7.0
           path: ./artifacts/
       - run: |
-          tar -xzvf ./artifacts/artifact-11.7.0.tar.gz
+          tar -xzvf ./artifacts/artifact-11.7.0.tar.gz ./cuda-11.7.0
+          ls -R .
           mkdir -p ./llm/llama.cpp/ggml/build/cuda-11/bin
           mkdir -p ./llm/llama.cpp/gguf/build/cuda-11/bin
-          mv ./artifacts/llama.cpp/gguf/build/cuda-11/bin/server ./llm/llama.cpp/gguf/build/cuda-11/bin/server
+          mv ./cuda-11.7.0/llama.cpp/gguf/build/cuda-11/bin/server ./llm/llama.cpp/gguf/build/cuda-11/bin/server
       - name: Build with all packaged in runners
         run: go build -o ollama -ldflags="-w -s -X github.com/brucemacd/ollama/version.Version=${{ github.ref_name }}"
       - name: Upload build artifact

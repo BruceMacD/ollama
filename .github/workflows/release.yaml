@@ -70,11 +70,13 @@ jobs:
           tar -xzvf ./artifacts/artifact-11.7.0.tar.gz -C ./artifacts/
           mkdir -p ./llm/llama.cpp/ggml/build/cuda-11/bin
           mkdir -p ./llm/llama.cpp/gguf/build/cuda-11/bin
+          mv ./artifacts/llm/llama.cpp/ggml/build/cuda-11/bin/server ./llm/llama.cpp/ggml/build/cuda-11/bin/server
           mv ./artifacts/llm/llama.cpp/gguf/build/cuda-11/bin/server ./llm/llama.cpp/gguf/build/cuda-11/bin/server
           rm -rf ./artifacts/llm
           tar -xzvf ./artifacts/artifact-12.1.0.tar.gz -C ./artifacts/
           mkdir -p ./llm/llama.cpp/ggml/build/cuda-12/bin
           mkdir -p ./llm/llama.cpp/gguf/build/cuda-12/bin
+          mv ./artifacts/llm/llama.cpp/ggml/build/cuda-12/bin/server ./llm/llama.cpp/ggml/build/cuda-12/bin/server
           mv ./artifacts/llm/llama.cpp/gguf/build/cuda-12/bin/server ./llm/llama.cpp/gguf/build/cuda-12/bin/server
           rm -rf ./artifacts/llm
 
